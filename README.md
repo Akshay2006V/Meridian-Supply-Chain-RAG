@@ -5,14 +5,14 @@
 </p>
 
 <p align="center">
-  A local Retrieval-Augmented Generation (RAG) assistant that transforms enterprise supply-chain documents into fast, evidence-based answers.
+  A local Retrieval-Augmented Generation system that turns enterprise supply-chain and procurement documents into grounded, evidence-based answers.
 </p>
 
 <p align="center">
 
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local_AI-black?style=for-the-badge)
-![Qwen](https://img.shields.io/badge/Qwen3-4B-7C3AED?style=for-the-badge)
+![Qwen3](https://img.shields.io/badge/Qwen3-4B-7C3AED?style=for-the-badge)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_DB-FF6F00?style=for-the-badge)
 ![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
 
@@ -20,111 +20,119 @@
 
 ---
 
-## 📌 Project Overview
+## 📌 Overview
 
-**Meridian Supply Chain RAG** is a locally running AI-powered document intelligence system designed to answer questions about supplier performance, procurement policy, delivery, quality, inventory, purchasing, and supply-chain operations.
+**Meridian Supply Chain RAG** is a local, document-grounded AI assistant designed for supply-chain and procurement intelligence.
 
-Instead of searching through lengthy PDF documents manually, users can ask natural-language questions and receive concise, grounded answers derived from the indexed Meridian Components documents.
+Instead of manually searching through long PDF documents, users can ask natural-language questions and receive concise answers grounded in the indexed Meridian Components knowledge base.
 
-The system is intentionally designed around one principle:
+The system is designed around one core principle:
 
-> **Retrieve the evidence first. Answer only from the evidence. Never invent information that is not present in the supplied documents.**
+> **Retrieve the evidence first. Answer only from the evidence. Do not fabricate unsupported information.**
+
+The complete workflow runs locally using Ollama, ChromaDB, and the supplied Python components. No OpenAI API key is required.
 
 ---
 
 # 🎯 Problem Statement
 
-Supply-chain and procurement teams frequently work with operational documents containing:
+Supply-chain and procurement teams regularly work with documents containing:
 
 - Supplier performance metrics
 - Procurement policies
 - Purchase-order approval rules
 - Delivery performance
 - Quality and defect information
-- Safety-stock requirements
+- Inventory and safety-stock requirements
+- Supplier classification criteria
 - Production interruptions
-- Supplier risks
-- Operational events
+- Operational and sourcing risks
 
-Traditional document search makes it difficult to connect information across different documents.
+Important information may be distributed across multiple documents. Conventional document search can make it difficult to connect those facts and answer operational questions quickly.
 
 For example:
 
-> **Kaveri Metals reported 88.1% on-time delivery and 1,150 PPM defects. What procurement-policy consequences apply?**
+> **A supplier has poor delivery performance and a high defect rate. What procurement-policy consequences apply?**
 
-Answering this requires combining:
+Answering that question may require information from both:
 
-1. Supplier performance information from the supply-chain review
-2. Thresholds and consequences from the procurement policy
+1. A supplier performance review
+2. A procurement policy handbook
 
-This project demonstrates how RAG can convert those documents into an interactive enterprise knowledge system.
+This project demonstrates how RAG can connect those sources and provide grounded answers through an interactive application.
 
 ---
 
 # 💡 Solution
 
-The application combines:
+Meridian Supply Chain RAG combines document ingestion, embeddings, vector retrieval, deterministic answer paths, and local LLM synthesis.
 
 ```text
-PDF ingestion
+PDF Documents
       ↓
-Text extraction
+Text Extraction
       ↓
-Recursive chunking
+Recursive Chunking
       ↓
-Embedding generation
+Nomic Embeddings
       ↓
-ChromaDB semantic retrieval
+ChromaDB
       ↓
-Relevant evidence
+Semantic Retrieval
       ↓
-Grounded answer extraction
+Relevant Evidence
       ↓
-Qwen3 4B fallback when synthesis is required
+Deterministic Answer / Qwen3 Synthesis
+      ↓
+Grounded Response
+      ↓
+Source References
 ```
 
-The result is a lightweight local AI assistant that can answer supply-chain questions without requiring an external OpenAI API key.
+The result is a lightweight local knowledge assistant for supply-chain and procurement analysis.
 
 ---
 
 # 🧠 System Architecture
 
 ```text
-                    ┌───────────────────────────┐
-                    │       User Question       │
-                    └─────────────┬─────────────┘
+                    ┌──────────────────────────┐
+                    │       User Question      │
+                    └────────────┬─────────────┘
+                                 │
+                                 ▼
+                    ┌──────────────────────────┐
+                    │     Query Embedding      │
+                    │    Nomic Embed Text      │
+                    └────────────┬─────────────┘
+                                 │
+                                 ▼
+                    ┌──────────────────────────┐
+                    │        ChromaDB           │
+                    │   Semantic Vector Search  │
+                    └────────────┬─────────────┘
+                                 │
+                                 ▼
+                    ┌──────────────────────────┐
+                    │   Retrieved PDF Chunks   │
+                    │  + source/page metadata  │
+                    └────────────┬─────────────┘
+                                 │
+                         ┌───────┴────────┐
+                         │                │
+                         ▼                ▼
+                ┌────────────────┐  ┌────────────────┐
+                │ Deterministic  │  │    Qwen3 4B   │
+                │ Answer Path    │  │  Synthesis     │
+                └───────┬────────┘  └───────┬────────┘
+                        │                   │
+                        └─────────┬─────────┘
                                   │
                                   ▼
-                    ┌───────────────────────────┐
-                    │     Query Embedding       │
-                    │   Nomic Embed Text        │
-                    └─────────────┬─────────────┘
-                                  │
-                                  ▼
-                    ┌───────────────────────────┐
-                    │        ChromaDB            │
-                    │   Semantic Vector Search   │
-                    └─────────────┬─────────────┘
-                                  │
-                                  ▼
-                    ┌───────────────────────────┐
-                    │   Retrieved PDF Chunks    │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                    ▼                           ▼
-          ┌─────────────────────┐    ┌─────────────────────┐
-          │ Deterministic       │    │ Qwen3 4B            │
-          │ Answer Extraction   │    │ LLM Fallback        │
-          └──────────┬──────────┘    └──────────┬──────────┘
-                     │                          │
-                     └────────────┬─────────────┘
-                                  │
-                                  ▼
-                    ┌───────────────────────────┐
-                    │       Grounded Answer     │
-                    └───────────────────────────┘
+                    ┌──────────────────────────┐
+                    │      Grounded Answer     │
+                    │   + Source References    │
+                    └──────────────────────────┘
 ```
 
 ---
@@ -133,34 +141,32 @@ The result is a lightweight local AI assistant that can answer supply-chain ques
 
 ## 1. Document Ingestion
 
-The supplied Meridian PDF documents are processed using `PyPDF`.
+PDF files are processed using **PyPDF**.
 
-## 2. Text Extraction
+The ingestion process preserves document and page information so that retrieved evidence can be traced back to its source.
 
-Text is extracted page-by-page while preserving the source document and page metadata.
+## 2. Text Chunking
 
-## 3. Recursive Chunking
-
-The project uses LangChain's recursive text splitter.
+Extracted text is split using LangChain's recursive text splitter.
 
 ```text
-Chunk size  : 1000 characters
-Overlap     : 150 characters
+Chunk size : 1000 characters
+Overlap    : 150 characters
 ```
 
-The chunk size keeps policy clauses, supplier metrics, and related evidence together, while the overlap preserves context across adjacent chunks.
+The overlap helps preserve context across adjacent chunks.
 
-## 4. Embedding Generation
+## 3. Embedding Generation
 
-Each chunk is converted into a vector representation using:
+Each text chunk is converted into a vector representation using:
 
 ```text
 nomic-embed-text
 ```
 
-## 5. Vector Storage
+## 4. Vector Storage
 
-Embeddings and their metadata are stored in a persistent:
+Embeddings and document metadata are stored in a persistent:
 
 ```text
 ChromaDB
@@ -168,33 +174,33 @@ ChromaDB
 
 collection.
 
-## 6. Query Retrieval
+## 5. Query Retrieval
 
-A user question follows this pipeline:
+A user question is embedded and compared against the indexed knowledge base.
 
 ```text
 Question
    ↓
-Query embedding
+Query Embedding
    ↓
-ChromaDB semantic search
+ChromaDB Search
    ↓
-Relevant document chunks
+Relevant Chunks
 ```
 
-## 7. Grounded Answer Generation
+## 6. Answer Generation
 
-The application uses retrieved context as the factual source for the answer.
+The system uses deterministic answer paths for supported factual queries and can use **Qwen3 4B** when additional synthesis is required.
 
-For questions that require additional synthesis, the system can use:
+## 7. Grounded Responses
 
-```text
-Qwen3 4B
-```
+The retrieved document evidence forms the basis of the answer.
+
+Relevant source and page information can be shown alongside the response.
 
 ## 8. Unsupported Information Handling
 
-When the requested information is not supported by the available documents, the system refuses to fabricate an answer.
+When the requested information is not contained in the available knowledge base, the system refuses to invent an answer.
 
 Example:
 
@@ -202,19 +208,19 @@ Example:
 User:
 What is the annual salary of the Head of Procurement?
 
-System:
+Meridian:
 I cannot answer that from the supplied documents.
 ```
 
-This is a deliberate hallucination-control mechanism.
+This is an intentional hallucination-control mechanism.
 
 ---
 
 # ⭐ Key Features
 
-## 📄 PDF-Based Knowledge Base
+## 📄 Document Knowledge Base
 
-The current knowledge base contains:
+The supplied knowledge base contains:
 
 ```text
 Meridian_Procurement_Policy_Handbook_v4.2.pdf
@@ -223,78 +229,86 @@ Meridian_Supply_Chain_Review_Q1_FY2025-26.pdf
 
 ## 🔎 Semantic Search
 
-Questions are converted into embeddings and matched against indexed document chunks using ChromaDB.
+Natural-language questions are converted into embeddings and matched against relevant document chunks using ChromaDB.
 
 ## 🏭 Supply-Chain Intelligence
 
-The assistant can answer questions involving:
+The assistant supports questions involving:
 
 - Supplier performance
 - Supplier spend
 - Delivery performance
 - Quality metrics
 - Defect rates
-- Procurement rules
-- Approval authority
+- Procurement policy
+- Purchase-order approval authority
 - Safety stock
-- Line stoppages
 - Supplier classification
+- Line stoppages
 - Supply-chain risks
 
-## 🧾 Procurement Policy Reasoning
+## 🧾 Policy-Aware Reasoning
 
-The system can combine supplier-performance evidence with procurement-policy thresholds.
+Supplier-performance evidence can be interpreted together with procurement-policy rules.
 
 ```text
-Supplier Performance
-        +
+Supplier Evidence
+       +
 Procurement Policy
-        ↓
-Applicable Policy Consequence
+       ↓
+Applicable Procurement Decision
 ```
 
 ## 🚫 Hallucination Resistance
 
-The system is intentionally designed to prefer:
+When information is not supported by the documents, the system prefers an explicit refusal over fabrication.
 
-```text
-"I cannot answer that from the supplied documents."
-```
+## 💬 Native Streamlit Interface
 
-over unsupported or fabricated information.
+The application uses native Streamlit components and provides:
+
+- Knowledge-base summary
+- Native sidebar
+- Chat history
+- New-chat control
+- Suggested questions
+- Native chat composer
+- PDF attachments directly from the chat composer
+- Multiple PDF attachments
+- Automatic document ingestion
+- Source references
+- Native Streamlit menu/settings
 
 ## ⚡ Local Execution
 
-The core AI workflow operates locally through Ollama, avoiding dependence on an external LLM API.
+The core AI workflow runs locally with Ollama and ChromaDB.
+
+No external OpenAI API key is required.
 
 ---
 
 # 🧪 Automated Validation
 
-The project includes:
+The repository includes:
 
 ```text
 test_rag.py
 ```
 
-The automated suite validates six representative scenarios:
+The test suite covers six representative scenarios:
 
-| Test | Scenario |
+| # | Validation Scenario |
 |---|---|
 | 1 | Highest-spend supplier |
 | 2 | Line stoppages and downtime |
-| 3 | Purchase-order approval |
+| 3 | Purchase-order approval authority |
 | 4 | Critical supplier classification |
 | 5 | Safety-stock calculation |
 | 6 | Unsupported question handling |
 
-### Final Automated Result
+### Final Validation Result
 
 ```text
-============================================================
-MERIDIAN RAG AUTOMATED TESTS
-============================================================
-
 Passed: 6
 Failed: 0
 Total : 6
@@ -302,7 +316,7 @@ Total : 6
 RESULT: ALL TESTS PASSED
 ```
 
-These automated tests were used as a repeatable validation layer during development.
+These tests provide repeatable validation of the core RAG behavior.
 
 ---
 
@@ -312,171 +326,110 @@ These automated tests were used as a repeatable validation layer during developm
 
 > Which supplier had the highest spend in Q1, and what was its on-time delivery percentage?
 
-### Answer
-
-**Shenzhen Rui Electronics** had the highest Q1 spend at **₹21.9 crore**, with **79.5% on-time delivery**.
-
----
+**Expected result:** Shenzhen Rui Electronics had the highest Q1 spend at **₹21.9 crore**, with **79.5% on-time delivery**.
 
 ## 2. Line Stoppages
 
 > How many line stoppages happened in Q1, what was the total downtime, and what caused them?
 
-### Answer
-
-There were **7 line-stoppage events**, resulting in **41 hours of downtime**.
-
-The causes included:
-
-- Four microcontroller shortages involving Shenzhen Rui Electronics
-- Two PCB lots rejected at incoming inspection involving Trident Circuit Boards
-- One transporter strike in the Coimbatore–Pune corridor
-
----
+**Expected result:** **7 line-stoppage events** and **41 hours of downtime**, involving microcontroller shortages, rejected PCB lots, and a transporter strike.
 
 ## 3. Purchase-Order Approval
 
 > What is the approval authority for a purchase order worth ₹1.4 crore?
 
-### Answer
-
-A purchase order worth **₹1.4 crore** requires approval from the **Chief Operating Officer**.
-
----
+**Expected result:** Approval from the **Chief Operating Officer**.
 
 ## 4. Supplier Classification
 
 > What are the four supplier classification categories, and what qualifies a supplier as Critical?
 
-### Answer
+**Expected result:**
 
-The four categories are:
+```text
+Critical
+Strategic
+Standard
+Tail
+```
 
-- Critical
-- Strategic
-- Standard
-- Tail
+Critical classification can include conditions such as:
 
-A supplier is classified as Critical when it is:
+- Single-source supply
+- Annual spend above ₹10 crore
+- Safety-related components
 
-- Single-source for any part
-- Above ₹10 crore annual spend
-- Supplying a safety-related component
+## 5. Procurement Policy Consequence
 
----
+> Kaveri Metals had 88.1% on-time delivery and 1,150 PPM defects in Q1. What procurement policy consequences apply?
 
-## 5. Kaveri Metals Policy Consequences
+**Expected result:** The defect rate exceeds the applicable 500 PPM threshold, triggering the relevant quality clause, rework-cost responsibility, and increased incoming inspection requirements.
 
-> Kaveri Metals had 88.1% on-time delivery and 1,150 PPM defects in Q1. What procurement policy consequences apply to this supplier?
+## 6. Single-Source Supplier
 
-### Answer
+> The microcontroller supplier is single-source. What does the sourcing policy require?
 
-Kaveri Metals' **1,150 PPM defect rate** exceeds the **500 PPM** policy threshold, so Clause 6.3 applies.
-
-The consequence is:
-
-- Supplier bears rework cost at **₹120 per affected unit**
-- **100% incoming inspection** is imposed at the supplier's cost until three consecutive lots are accepted without defect
-
-Its 88.1% on-time delivery does not trigger the below-85% delivery clause.
-
----
-
-## 6. Single-Source Microcontroller Supplier
-
-> The microcontroller supplier is single-source. What does the sourcing policy require in this situation, and what is the company already doing about it?
-
-### Answer
-
-A qualified second source must be established **within 12 months** of Critical classification.
-
-As a temporary mitigation, the company is shifting **30% of Shenzhen microcontroller volume to air freight** while qualification of an alternate supplier is underway.
-
----
+**Expected result:** A qualified second source must be established within the policy's specified period, with temporary mitigation while alternate-source qualification is underway.
 
 ## 7. Safety Stock
 
-> Microcontrollers are imported with a 46-day lead time. Using the safety-stock policy, how many days of stock should be held for this part?
+> Microcontrollers are imported with a 46-day lead time. Using the safety-stock policy, how many days of stock should be held?
 
-### Answer
-
-The calculated safety stock is:
+**Expected result:**
 
 ```text
 46 × 0.25 = 11.5 days
 ```
 
-The applicable minimum safety-stock floor is **30 days**.
+The applicable policy floor makes the required safety stock:
 
-Therefore:
+**30 days**
 
-**Required safety stock = 30 days**
-
----
-
-## 8. Trident Circuit Boards
-
-> Trident Circuit Boards had a defect rate of 640 PPM. What is the cost consequence under the policy?
-
-### Answer
-
-640 PPM exceeds the policy threshold of 500 PPM.
-
-Therefore:
-
-- Supplier bears rework cost at **₹120 per affected unit**
-- **100% incoming inspection** is imposed at the supplier's cost until three consecutive lots are accepted without defect
-
----
-
-## 9. B-Rating Band and Escalation
-
-> Which suppliers would fall below the B rating band on on-time delivery alone, and what is the escalation path for them?
-
-### Answer
-
-No supplier in the available Q1 dataset falls below the **75% B-band threshold** on on-time delivery alone.
-
-The escalation path for delivery-related issues is:
-
-| Level | Owner | Response Time | Typical Trigger |
-|---|---|---|---|
-| 1 | Buyer | 24 hours | Delivery slippage up to 3 days |
-| 2 | Category Manager | 48 hours | Slippage beyond 3 days or rejected lot |
-| 3 | Head of Procurement | 72 hours | Risk of line stoppage within 7 days |
-| 4 | Chief Operating Officer | 5 working days | Actual line stoppage or supplier insolvency signal |
-
----
-
-## 10. Unsupported Information
+## 8. Unsupported Information
 
 > What is the annual salary of the Head of Procurement?
 
-### Answer
+**Expected result:**
 
 ```text
 I cannot answer that from the supplied documents.
 ```
 
-This demonstrates the system's ability to reject unsupported requests rather than hallucinating information.
+This demonstrates the system's grounded-answer behavior.
 
 ---
 
 # 🖥️ Application Interface
 
-The Streamlit interface provides three primary areas:
+The final interface is implemented with native Streamlit components.
 
-### Ask Meridian
+The main application provides:
 
-Natural-language questions can be entered directly into the application.
+### Knowledge Base
 
-### Answer
+Displays the indexed document and chunk counts.
 
-The generated response is presented in a clean response area.
+### Chat
+
+Users can ask natural-language questions directly through the native chat composer.
+
+### PDF Attachments
+
+Users can attach one or more PDF documents directly through the chat composer.
+
+Attached documents are written to the local `data/` directory and passed through the existing ingestion pipeline.
+
+### Chat History
+
+Conversation titles are maintained for the current application session.
+
+### New Chat
+
+Starts a fresh conversation without changing the indexed knowledge base.
 
 ### Sources
 
-Retrieved source documents and page information are displayed below the answer.
+Retrieved source documents and page references can be shown with grounded answers.
 
 ---
 
@@ -486,13 +439,13 @@ Retrieved source documents and page information are displayed below the answer.
 
 ![Meridian Supply Chain AI](docs/screenshots/meridian_app_home.png)
 
-*Main application interface showing the Meridian Supply Chain AI assistant, indexed documents, technology stack, and query interface.*
+*Final Meridian Supply Chain AI interface showing the knowledge base, native Streamlit workflow, chat experience, and document-grounded assistant.*
 
 ## GitHub Repository
 
 ![Meridian Supply Chain GitHub Repository](docs/screenshots/meridian_github.png)
 
-*Public GitHub repository showing the project structure, README, source files, and documentation.*
+*Final streamlined GitHub repository containing the application, documents, tests, screenshots, and project documentation.*
 
 ---
 
@@ -501,53 +454,55 @@ Retrieved source documents and page information are displayed below the answer.
 | Component | Technology |
 |---|---|
 | Programming Language | Python 3.14 |
-| LLM Runtime | Ollama |
+| LLM Runtime | Ollama 0.6.2 |
 | Language Model | Qwen3 4B |
 | Embedding Model | Nomic Embed Text |
-| Vector Database | ChromaDB |
-| PDF Parser | PyPDF |
-| Text Splitting | LangChain Text Splitters |
-| Web Interface | Streamlit |
+| Vector Database | ChromaDB 1.5.9 |
+| PDF Parser | PyPDF 6.16.1 |
+| Text Splitting | LangChain Text Splitters 1.1.2 |
+| User Interface | Streamlit 1.61.1 |
 | Version Control | Git + GitHub |
+
+The pinned dependencies are defined in `requirements.txt`.
 
 ---
 
-# 📁 Project Structure
+# 📁 Final Project Structure
 
 ```text
-supplychain-rag/
-│
-├── app.py
-│   └── Streamlit user interface
-│
-├── rag.py
-│   └── Retrieval and answer-generation pipeline
-│
-├── ingest.py
-│   └── PDF ingestion and ChromaDB indexing
-│
-├── test_rag.py
-│   └── Automated RAG validation tests
-│
-├── requirements.txt
-│   └── Python dependencies
-│
-├── README.md
-│   └── Project documentation
-│
-├── .env.example
-│   └── Example local configuration
-│
-├── .gitignore
-│   └── Git exclusions
+Meridian-Supply-Chain-RAG/
 │
 ├── .streamlit/
-│   └── Streamlit configuration
+│   └── config.toml
 │
-└── data/
-    ├── Meridian_Procurement_Policy_Handbook_v4.2.pdf
-    └── Meridian_Supply_Chain_Review_Q1_FY2025-26.pdf
+├── data/
+│   ├── Meridian_Procurement_Policy_Handbook_v4.2.pdf
+│   └── Meridian_Supply_Chain_Review_Q1_FY2025-26.pdf
+│
+├── docs/
+│   └── screenshots/
+│       ├── meridian_app_home.png
+│       └── meridian_github.png
+│
+├── .env.example
+├── .gitignore
+├── README.md
+├── app.py
+├── ingest.py
+├── rag.py
+├── requirements.txt
+└── test_rag.py
 ```
+
+Generated files such as:
+
+```text
+.venv/
+__pycache__/
+chroma_db/
+```
+
+are intentionally excluded from version control.
 
 ---
 
@@ -569,8 +524,6 @@ git --version
 ollama --version
 ```
 
----
-
 ## 1. Clone the Repository
 
 ```powershell
@@ -578,29 +531,23 @@ git clone https://github.com/Akshay2006V/Meridian-Supply-Chain-RAG.git
 cd Meridian-Supply-Chain-RAG
 ```
 
----
-
 ## 2. Create the Virtual Environment
 
 ```powershell
 python -m venv .venv
 ```
 
-Activate on Windows:
+Activate on Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
-
----
 
 ## 3. Install Dependencies
 
 ```powershell
 pip install -r requirements.txt
 ```
-
----
 
 ## 4. Install Ollama Models
 
@@ -615,31 +562,29 @@ Verify:
 ollama list
 ```
 
----
+## 5. Build the Local Document Index
 
-## 5. Ingest Documents
+The ChromaDB vector store is generated locally and is not committed to GitHub.
 
-Build the local ChromaDB index:
+Run:
 
 ```powershell
 python ingest.py
 ```
 
-The ingestion pipeline follows:
+The ingestion flow is:
 
 ```text
 PDF
  ↓
-Text Extraction
+PyPDF extraction
  ↓
-Recursive Chunking
+Recursive chunking
  ↓
-Embedding
+Nomic embeddings
  ↓
-Persistent ChromaDB
+ChromaDB
 ```
-
----
 
 ## 6. Run the CLI RAG
 
@@ -651,10 +596,9 @@ Example:
 
 ```text
 Enter your question:
+
 What is the approval authority for a purchase order worth ₹1.4 crore?
 ```
-
----
 
 ## 7. Run the Streamlit Application
 
@@ -668,120 +612,24 @@ Open:
 http://localhost:8501
 ```
 
+The interface supports:
+
+- Natural-language questions
+- Chat history
+- New conversations
+- PDF attachments
+- Automatic indexing
+- Document-grounded responses
+
 ---
 
-# 🧪 Running the Tests
-
-Run the complete automated validation suite:
+# 🧪 Run the Test Suite
 
 ```powershell
 python test_rag.py
 ```
 
-Expected final benchmark:
-
-```text
-Passed: 6
-Failed: 0
-Total : 6
-```
-
----
-
-# 🔐 Privacy & Local Execution
-
-The project is designed for local execution.
-
-The core workflow is:
-
-```text
-Ollama
-   ↓
-Local LLM
-   +
-Local Embeddings
-   ↓
-ChromaDB
-```
-
-No OpenAI API key is required.
-
-The following are excluded from version control:
-
-```text
-.venv/
-.env
-__pycache__/
-*.pyc
-chroma_db/
-```
-
----
-
-# 📐 Design Principles
-
-## 1. Grounded Answers
-
-The system answers from the supplied documents rather than relying on unsupported general knowledge.
-
-## 2. Evidence Before Generation
-
-Relevant document content is retrieved before an answer is generated.
-
-## 3. Exact Information Preservation
-
-Important names, numerical values, units, supplier names, and policy thresholds should be preserved.
-
-## 4. Unsupported Questions Should Be Rejected
-
-When evidence is unavailable, the system should prefer:
-
-```text
-I cannot answer that from the supplied documents.
-```
-
-over an invented answer.
-
-## 5. Local-First AI
-
-The project demonstrates that practical document intelligence can be implemented using local models, local embeddings, and a local vector database.
-
----
-
-# 📊 Assignment Validation — All 10 Required Questions
-
-The application was evaluated against the ten required assignment questions.
-
-| # | Question | Validation |
-|---|---|---|
-| 1 | Highest-spend supplier and on-time delivery | ✅ |
-| 2 | Line stoppages, downtime, and causes | ✅ |
-| 3 | ₹1.4 crore purchase-order approval authority | ✅ |
-| 4 | Supplier categories and Critical criteria | ✅ |
-| 5 | Kaveri Metals policy consequences | ✅ |
-| 6 | Single-source microcontroller sourcing requirement | ✅ |
-| 7 | Microcontroller safety stock | ✅ |
-| 8 | Trident Circuit Boards policy consequence | ✅ |
-| 9 | B-rating threshold and escalation path | ✅ |
-| 10 | Unsupported salary question | ✅ Correct refusal |
-
-The ten questions are documented above together with the answers produced by the final implementation.
-
----
-
-# ⚠️ Honest Validation Note
-
-During development, several questions initially exposed weaknesses in retrieval coverage and answer generation.
-
-Examples included:
-
-- A line-stoppage answer that did not preserve every supplier name
-- An unsupported-question response that initially narrated its analysis instead of returning the required refusal
-- Cross-document policy questions that initially produced incomplete conclusions
-
-These issues were addressed through changes to the retrieval balance, answer-generation constraints, unsupported-topic handling, and validation logic.
-
-The repeatable automated benchmark ultimately reached:
+Expected:
 
 ```text
 Passed: 6
@@ -791,172 +639,72 @@ Total : 6
 RESULT: ALL TESTS PASSED
 ```
 
-This distinction is intentional: development-stage failures are acknowledged rather than hidden, while the final automated benchmark represents the validated state of the implementation.
+---
+
+# 🔐 Local & Privacy-Oriented Design
+
+The project is designed around local execution:
+
+- LLM inference runs through Ollama
+- Embeddings are generated locally
+- ChromaDB is stored locally
+- Source documents remain in the local project environment
+- No OpenAI API key is required
+
+This architecture is suitable for document collections where keeping the core retrieval workflow local is important.
 
 ---
 
-# 📈 Why This Project Matters
+# 🚫 Limitations
 
-Supply-chain decisions often require connecting multiple dimensions:
+Meridian Supply Chain RAG is a document-grounded assistant, not a general-purpose enterprise database or unrestricted AI system.
 
-```text
-Supplier Performance
-        +
-Procurement Policy
-        +
-Quality
-        +
-Delivery
-        +
-Inventory Risk
-        ↓
-Operational Decision
-```
+Answer quality depends on:
 
-This project demonstrates how RAG can act as an interface between operational documents and the person making the decision.
+- The coverage of the indexed documents
+- Retrieval quality
+- The embedding model
+- The supplied policy and performance data
+- The quality of the source PDFs
 
-Instead of manually searching through pages of reports and policies, users can ask direct questions in natural language and retrieve evidence-backed information.
+The application deliberately does not provide information that is absent from its knowledge base.
 
 ---
 
-# 🎓 Learning Outcomes
+# 📌 Assignment
 
-The project provided hands-on experience with:
-
-- Retrieval-Augmented Generation
-- Semantic search
-- Vector databases
-- Embeddings
-- Local LLM inference
-- PDF processing
-- Recursive chunking
-- Prompt design
-- Grounding and hallucination control
-- Automated testing
-- Streamlit application development
-- Git and GitHub workflow
-
-Most importantly, it demonstrates the difference between:
-
-```text
-Generating an answer
-```
-
-and:
-
-```text
-Generating an answer supported by evidence
-```
-
----
-
-# 🚧 Current Limitations
-
-The current implementation is intentionally focused on the supplied Meridian document set.
-
-Current limitations include:
-
-- The knowledge base contains two source documents.
-- Answers are limited to information contained in those documents.
-- Qwen3 4B is a compact local model and has less general reasoning capacity than larger frontier models.
-- The system is optimized for grounded document QA rather than unrestricted general-purpose conversation.
-- The current interface is designed for local use.
-
----
-
-# 🔮 Future Improvements
-
-Potential extensions include:
-
-- Multi-quarter supply-chain analysis
-- Supplier trend dashboards
-- Automated supplier-risk scoring
-- Document upload directly from the UI
-- Automatic re-indexing
-- Hybrid retrieval
-- Reranking models
-- Conversation history
-- REST API integration
-- Authentication and role-based access
-- Production deployment
-- Advanced analytics and visualization
-- Supplier comparison dashboards
-- Automated procurement recommendations
-
----
-
-# 📚 Source Documents
-
-The current knowledge base contains:
-
-1. **Meridian Procurement Policy Handbook v4.2**
-2. **Meridian Supply Chain Review Q1 FY2025-26**
-
-These documents form the source of truth for the current RAG system.
-
----
-
-# 🎯 Conclusion
-
-Meridian Supply Chain RAG demonstrates how Retrieval-Augmented Generation can transform operational documents into a practical supply-chain intelligence interface.
-
-The project combines:
-
-```text
-Document Processing
-        +
-Semantic Retrieval
-        +
-Persistent Vector Storage
-        +
-Grounded Answering
-        +
-Unsupported-Question Detection
-        ↓
-Supply-Chain Decision Support
-```
-
-The most important outcome is not simply generating answers.
-
-It is generating answers that are **supported by evidence from the supplied documents** while explicitly refusing to invent information when that evidence does not exist.
-
-The project therefore focuses on a practical principle for enterprise AI:
-
-> **Retrieve → Ground → Generate → Verify**
-
----
-
-# 👨‍💻 Author
-
-**Akshay Vankayala**
-
-Mechanical Engineering Student  
-Vishnu Institute of Technology
-
-GitHub:
-
-https://github.com/Akshay2006V
-
-Project Repository:
-
-https://github.com/Akshay2006V/Meridian-Supply-Chain-RAG
-
----
-
-# 🏆 Project Submission
+This project was developed as part of the:
 
 **HCLTech × Economic Times AI Masterclass**
 
-### Project
+The implementation demonstrates:
 
-> **Meridian Supply Chain RAG**
-
-A grounded AI assistant for supply-chain and procurement document intelligence.
+- Local RAG architecture
+- Semantic document retrieval
+- Grounded answer generation
+- Unsupported-question handling
+- Automated validation
+- Interactive Streamlit deployment
 
 ---
 
-## ⭐ Final Takeaway
+# ✅ Final Status
 
-> **The objective of an enterprise AI assistant is not to answer every question.**
->
-> **It is to retrieve the right evidence, answer from that evidence, and clearly say when the evidence is not available.**
+```text
+Project      : Meridian Supply Chain RAG
+Interface    : Streamlit
+LLM          : Qwen3 4B via Ollama
+Embeddings   : Nomic Embed Text
+Vector DB    : ChromaDB
+Validation   : 6 / 6 tests passed
+Execution    : Local
+Repository   : GitHub
+Status       : Finalized
+```
+
+---
+
+# 🔗 Repository
+
+**GitHub:**  
+https://github.com/Akshay2006V/Meridian-Supply-Chain-RAG
