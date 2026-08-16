@@ -242,7 +242,7 @@ if ask_button:
 
             try:
 
-                answer, retrieved = ask(
+                answer, retrieved, timing = ask(
                     question.strip()
                 )
 
