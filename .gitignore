@@ -1,7 +1,12 @@
 .venv/
-.env
 __pycache__/
 *.pyc
+
+backups_*/
+*.backup
+
+.env
+*.log
+
+.chroma/
 chroma_db/
-.streamlit/secrets.toml
-.agents/
