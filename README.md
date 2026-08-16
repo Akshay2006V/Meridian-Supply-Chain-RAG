@@ -484,15 +484,13 @@ Retrieved source documents and page information are displayed below the answer.
 
 ## Streamlit Application
 
-![Meridian Supply Chain AI](<img width="1920" height="1080" alt="Screenshot 2026-08-16 203541" src="https://github.com/user-attachments/assets/044a5399-bc9b-4e83-8f7a-1fa50d55d46d" />
-)
+![Meridian Supply Chain AI](docs/screenshots/meridian_app_home.png)
 
 *Main application interface showing the Meridian Supply Chain AI assistant, indexed documents, technology stack, and query interface.*
 
 ## GitHub Repository
 
-![Meridian Supply Chain GitHub Repository](<img width="1920" height="1080" alt="Screenshot 2026-08-16 203948" src="https://github.com/user-attachments/assets/f183a225-d596-4aef-9e14-3afb1bf20572" />
-)
+![Meridian Supply Chain GitHub Repository](docs/screenshots/meridian_github.png)
 
 *Public GitHub repository showing the project structure, README, source files, and documentation.*
 
