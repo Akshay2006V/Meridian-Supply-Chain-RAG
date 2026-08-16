@@ -1,0 +1,811 @@
+import textwrap
+from pathlib import Path
+
+import streamlit as st
+
+from ingest import ingest_paths
+from rag import ask, collection
+
+
+# ============================================================
+# PAGE CONFIG
+# ============================================================
+
+st.set_page_config(
+    page_title="Meridian Supply Chain AI",
+    page_icon="📦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
+# ============================================================
+# SESSION STATE
+# ============================================================
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "last_index_stats" not in st.session_state:
+    st.session_state.last_index_stats = None
+
+
+# ============================================================
+# GLOBAL UI
+# ============================================================
+
+st.markdown(
+    textwrap.dedent(
+        """
+        <style>
+
+        /* ====================================================
+           GLOBAL
+           ==================================================== */
+
+        .block-container {
+            max-width: 1180px;
+            padding-top: 1.35rem;
+            padding-bottom: 5rem;
+        }
+
+        header[data-testid="stHeader"] {
+            background: transparent;
+        }
+
+        footer {
+            visibility: hidden;
+        }
+
+        /* ====================================================
+           SIDEBAR
+           ==================================================== */
+
+        section[data-testid="stSidebar"] {
+            border-right: 1px solid rgba(128,128,128,0.14);
+        }
+
+        .side-brand {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 2px;
+        }
+
+        .side-caption {
+            font-size: 12px;
+            opacity: 0.58;
+            line-height: 1.5;
+        }
+
+        .side-section {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            opacity: 0.55;
+            margin-top: 18px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .side-pill {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 999px;
+            border: 1px solid rgba(128,128,128,0.18);
+            background: rgba(128,128,128,0.06);
+            font-size: 11px;
+            margin: 2px 4px 2px 0;
+        }
+
+        /* ====================================================
+           TOP BAR
+           ==================================================== */
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .brand-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            background: linear-gradient(135deg, #f1c27d, #b8773f);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.16);
+        }
+
+        .brand-title {
+            font-size: 20px;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.025em;
+        }
+
+        .brand-subtitle {
+            margin-top: 4px;
+            font-size: 12px;
+            opacity: 0.60;
+        }
+
+        .status-pill {
+            padding: 7px 11px;
+            border-radius: 999px;
+            border: 1px solid rgba(128,128,128,0.18);
+            background: rgba(128,128,128,0.055);
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        /* ====================================================
+           WELCOME PANEL
+           ==================================================== */
+
+        .welcome {
+            max-width: 860px;
+            margin: 4.5rem auto 2.6rem auto;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            font-size: 42px;
+            margin-bottom: 12px;
+        }
+
+        .welcome-title {
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 10px;
+        }
+
+        .welcome-text {
+            font-size: 15px;
+            opacity: 0.62;
+            line-height: 1.65;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .welcome-mini {
+            margin-top: 14px;
+            font-size: 11px;
+            opacity: 0.48;
+        }
+
+        /* ====================================================
+           STAT CARDS
+           ==================================================== */
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0 24px 0;
+        }
+
+        .stat-card {
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px solid rgba(128,128,128,0.16);
+            background: rgba(128,128,128,0.045);
+        }
+
+        .stat-value {
+            font-size: 21px;
+            font-weight: 800;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            margin-top: 3px;
+            opacity: 0.55;
+        }
+
+        /* ====================================================
+           SUGGESTIONS
+           ==================================================== */
+
+        .suggest-title {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            opacity: 0.52;
+            margin-bottom: 10px;
+        }
+
+        /* ====================================================
+           CHAT
+           ==================================================== */
+
+        [data-testid="stChatMessage"] {
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+        [data-testid="stChatMessageContent"] {
+            max-width: 820px;
+        }
+
+        .message-meta {
+            font-size: 10px;
+            opacity: 0.42;
+            margin-top: 6px;
+        }
+
+        /* ====================================================
+           SOURCES
+           ==================================================== */
+
+        .sources-title {
+            font-size: 12px;
+            font-weight: 800;
+            opacity: 0.62;
+            margin-top: 10px;
+            margin-bottom: 8px;
+        }
+
+        .source-card {
+            padding: 11px 13px;
+            margin: 7px 0;
+            border-radius: 12px;
+            border: 1px solid rgba(128,128,128,0.16);
+            background: rgba(128,128,128,0.035);
+        }
+
+        .source-name {
+            font-size: 12px;
+            font-weight: 750;
+        }
+
+        .source-detail {
+            font-size: 10px;
+            opacity: 0.54;
+            margin-top: 3px;
+        }
+
+        /* ====================================================
+           BUTTONS
+           ==================================================== */
+
+        div.stButton > button {
+            border-radius: 11px;
+            min-height: 40px;
+            font-weight: 700;
+        }
+
+        /* ====================================================
+           FILE UPLOADER
+           ==================================================== */
+
+        [data-testid="stFileUploader"] {
+            border-radius: 14px;
+        }
+
+        /* ====================================================
+           CHAT INPUT
+           ==================================================== */
+
+        [data-testid="stChatInput"] {
+            padding-bottom: 10px;
+        }
+
+        /* ====================================================
+           MOBILE
+           ==================================================== */
+
+        @media (max-width: 900px) {
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .welcome {
+                margin-top: 2rem;
+            }
+
+            .welcome-title {
+                font-size: 27px;
+            }
+
+        }
+
+        </style>
+        """
+    ),
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+with st.sidebar:
+
+    st.markdown(
+        """
+        <div class="side-brand">📦 Meridian Supply Chain AI</div>
+        <div class="side-caption">
+            Grounded enterprise document intelligence
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+
+    st.markdown(
+        '<div class="side-section">Knowledge Base</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.metric(
+        "Indexed chunks",
+        collection.count(),
+    )
+
+    uploaded_files = st.file_uploader(
+        "Add PDF documents",
+        type=["pdf"],
+        accept_multiple_files=True,
+        help="Upload one or more PDF files.",
+    )
+
+    if st.button(
+        "📥 Index Documents",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        if not uploaded_files:
+
+            st.warning(
+                "Upload at least one PDF first."
+            )
+
+        else:
+
+            data_dir = Path("data")
+            data_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            saved_paths = []
+
+            with st.spinner(
+                "Indexing documents..."
+            ):
+
+                try:
+
+                    for uploaded_file in uploaded_files:
+
+                        destination = (
+                            data_dir
+                            / uploaded_file.name
+                        )
+
+                        with open(
+                            destination,
+                            "wb",
+                        ) as file:
+
+                            file.write(
+                                uploaded_file.getbuffer()
+                            )
+
+                        saved_paths.append(
+                            destination
+                        )
+
+                    stats = ingest_paths(
+                        saved_paths
+                    )
+
+                    st.session_state.last_index_stats = stats
+
+                except Exception as exc:
+
+                    st.error(
+                        f"Indexing failed: {exc}"
+                    )
+
+                    st.stop()
+
+            if stats["new_chunks"] > 0:
+
+                st.success(
+                    f"{stats['files_checked']} file(s) checked • "
+                    f"{stats['new_chunks']} new chunks • "
+                    f"{stats['total_chunks']} total"
+                )
+
+            else:
+
+                st.info(
+                    f"{stats['files_checked']} file(s) checked • "
+                    f"Everything already indexed • "
+                    f"{stats['total_chunks']} total chunks"
+                )
+
+    st.divider()
+
+    st.markdown(
+        '<div class="side-section">AI Stack</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <span class="side-pill">Qwen3 4B</span>
+        <span class="side-pill">Nomic Embed</span>
+        <span class="side-pill">ChromaDB</span>
+        <span class="side-pill">PyPDF</span>
+        <span class="side-pill">Streamlit</span>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+
+    if st.button(
+        "🧹 Clear Chat",
+        use_container_width=True,
+    ):
+
+        st.session_state.messages = []
+        st.rerun()
+
+    st.markdown(
+        """
+        <div class="side-caption" style="margin-top:16px;">
+        Answers are generated only from the indexed Meridian documents.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# TOP BAR
+# ============================================================
+
+st.markdown(
+    """
+    <div class="topbar">
+        <div class="brand">
+            <div class="brand-icon">📦</div>
+            <div>
+                <div class="brand-title">Meridian Supply Chain AI</div>
+                <div class="brand-subtitle">
+                    Supply-chain & procurement intelligence
+                </div>
+            </div>
+        </div>
+
+        <div class="status-pill">
+            ● LOCAL RAG
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# WELCOME STATE
+# ============================================================
+
+if not st.session_state.messages:
+
+    st.markdown(
+        """
+        <div class="welcome">
+            <div class="welcome-icon">✦</div>
+
+            <div class="welcome-title">
+                What can I help you find?
+            </div>
+
+            <div class="welcome-text">
+                Ask questions about supplier performance,
+                procurement policy, delivery, quality,
+                inventory, and operational risk.
+            </div>
+
+            <div class="welcome-mini">
+                Answers stay grounded in the indexed Meridian documents.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="suggest-title">Try asking</div>',
+        unsafe_allow_html=True,
+    )
+
+    s1, s2 = st.columns(2)
+
+    with s1:
+
+        if st.button(
+            "Which supplier had the highest Q1 spend?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Which supplier had the highest spend "
+                        "in Q1, and what was its on-time "
+                        "delivery percentage?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+    with s2:
+
+        if st.button(
+            "How many line stoppages occurred?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "How many line stoppages happened "
+                        "in Q1, what was the total downtime, "
+                        "and what caused them?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+    s3, s4 = st.columns(2)
+
+    with s3:
+
+        if st.button(
+            "What is the ₹1.4 crore PO approval authority?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "What is the approval authority for "
+                        "a purchase order worth ₹1.4 crore?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+    with s4:
+
+        if st.button(
+            "How much safety stock is required?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Microcontrollers are imported with "
+                        "a 46-day lead time. Using the "
+                        "safety-stock policy, how many days "
+                        "of stock should be held for this part?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+
+# ============================================================
+# CHAT HISTORY
+# ============================================================
+
+for message in st.session_state.messages:
+
+    role = message["role"]
+
+    with st.chat_message(
+        role,
+        avatar="👤" if role == "user" else "📦",
+    ):
+
+        st.markdown(
+            message["content"]
+        )
+
+        if (
+            role == "assistant"
+            and message.get("sources")
+        ):
+
+            st.markdown(
+                '<div class="sources-title">Sources</div>',
+                unsafe_allow_html=True,
+            )
+
+            for source in message["sources"]:
+
+                st.markdown(
+                    f"""
+                    <div class="source-card">
+                        <div class="source-name">
+                            📄 {source["label"]}
+                        </div>
+
+                        <div class="source-detail">
+                            {source["source"]} • Page {source["page"]}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+
+# ============================================================
+# CHAT INPUT
+# ============================================================
+
+prompt = st.chat_input(
+    "Message Meridian Supply Chain AI..."
+)
+
+
+# ============================================================
+# HANDLE CHAT
+# ============================================================
+
+if prompt:
+
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": prompt,
+        }
+    )
+
+    with st.chat_message(
+        "user",
+        avatar="👤",
+    ):
+
+        st.markdown(prompt)
+
+
+    with st.chat_message(
+        "assistant",
+        avatar="📦",
+    ):
+
+        with st.spinner(
+            "Searching the Meridian knowledge base..."
+        ):
+
+            try:
+
+                answer, retrieved, timing = ask(
+                    prompt.strip()
+                )
+
+            except Exception as exc:
+
+                answer = (
+                    "An error occurred while processing "
+                    f"your question: {exc}"
+                )
+
+                retrieved = []
+                timing = {}
+
+
+        st.markdown(answer)
+
+        source_data = []
+        displayed_sources = set()
+
+        for item in retrieved:
+
+            metadata = item["metadata"]
+
+            source = metadata["source"]
+            page = metadata["page"]
+
+            source_key = (
+                source,
+                page,
+            )
+
+            if source_key in displayed_sources:
+                continue
+
+            displayed_sources.add(
+                source_key
+            )
+
+            if "Review" in source:
+
+                label = (
+                    "Supply Chain Performance Review"
+                )
+
+            elif "Policy" in source:
+
+                label = (
+                    "Procurement Policy Handbook"
+                )
+
+            else:
+
+                label = "Indexed PDF Document"
+
+            source_data.append(
+                {
+                    "label": label,
+                    "source": source,
+                    "page": page,
+                }
+            )
+
+
+        if source_data:
+
+            st.markdown(
+                '<div class="sources-title">Sources</div>',
+                unsafe_allow_html=True,
+            )
+
+            for source in source_data:
+
+                st.markdown(
+                    f"""
+                    <div class="source-card">
+                        <div class="source-name">
+                            📄 {source["label"]}
+                        </div>
+
+                        <div class="source-detail">
+                            {source["source"]} • Page {source["page"]}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer,
+            "sources": source_data,
+            "timing": timing,
+        }
+    )

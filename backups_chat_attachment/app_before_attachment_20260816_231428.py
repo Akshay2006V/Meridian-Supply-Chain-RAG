@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 from datetime import datetime
 
 import streamlit as st
@@ -37,42 +37,35 @@ if "chat_title" not in st.session_state:
 # HELPERS
 # ============================================================
 
-def indexed_document_count():
+def get_document_count():
     """Return the number of unique indexed source documents."""
 
     try:
-
-        result = collection.get(
+        data = collection.get(
             include=["metadatas"]
         )
 
-        metadatas = result.get(
+        metadatas = data.get(
             "metadatas",
             []
         )
 
-        sources = set()
+        documents = set()
 
         for metadata in metadatas:
-
-            if (
-                metadata
-                and metadata.get("source")
-            ):
-
-                sources.add(
+            if metadata and metadata.get("source"):
+                documents.add(
                     metadata["source"]
                 )
 
-        return len(sources)
+        return len(documents)
 
     except Exception:
-
         return 0
 
 
 def make_chat_title(question):
-    """Create a short title for sidebar history."""
+    """Create a compact title for chat history."""
 
     words = question.strip().split()
 
@@ -89,28 +82,8 @@ def make_chat_title(question):
     return title
 
 
-def add_history(title):
-
-    if (
-        title
-        and title not in st.session_state.chat_history
-    ):
-
-        st.session_state.chat_history.append(
-            title
-        )
-
-
-def start_new_chat():
-
-    st.session_state.messages = []
-
-    st.session_state.chat_title = (
-        "New conversation"
-    )
-
-
-def extract_sources(retrieved):
+def get_sources(retrieved):
+    """Extract unique source/page references."""
 
     sources = []
     seen = set()
@@ -152,7 +125,8 @@ def extract_sources(retrieved):
     return sources
 
 
-def run_rag(question):
+def ask_meridian(question):
+    """Run the existing RAG pipeline."""
 
     answer, retrieved, timing = ask(
         question
@@ -160,43 +134,25 @@ def run_rag(question):
 
     return (
         answer,
-        extract_sources(retrieved),
+        get_sources(retrieved),
         timing,
     )
 
 
-def index_uploaded_files(uploaded_files):
-
-    if not uploaded_files:
-        return None
-
-    data_dir = Path("data")
-
-    data_dir.mkdir(
-        parents=True,
-        exist_ok=True,
+def start_new_chat():
+    st.session_state.messages = []
+    st.session_state.chat_title = (
+        "New conversation"
     )
 
-    paths = []
 
-    for uploaded_file in uploaded_files:
+def add_history_title(title):
 
-        destination = (
-            data_dir
-            / uploaded_file.name
+    if title not in st.session_state.chat_history:
+
+        st.session_state.chat_history.append(
+            title
         )
-
-        destination.write_bytes(
-            uploaded_file.getbuffer()
-        )
-
-        paths.append(
-            destination
-        )
-
-    return ingest_paths(
-        paths
-    )
 
 
 # ============================================================
@@ -216,28 +172,114 @@ with st.sidebar:
     st.divider()
 
     # --------------------------------------------------------
-    # KNOWLEDGE BASE
+    # DOCUMENT KNOWLEDGE BASE
     # --------------------------------------------------------
 
     st.subheader(
         "Knowledge Base"
     )
 
-    col_a, col_b = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with col_a:
-
+    with col1:
         st.metric(
             "Chunks",
-            collection.count(),
+            collection.count()
         )
 
-    with col_b:
-
+    with col2:
         st.metric(
             "PDFs",
-            indexed_document_count(),
+            get_document_count()
         )
+
+    st.write("")
+
+    st.subheader(
+        "Add PDF documents"
+    )
+
+    uploaded_files = st.file_uploader(
+        "Upload PDF documents",
+        type=["pdf"],
+        accept_multiple_files=True,
+        help="Select one or more PDF files to add to the local knowledge base.",
+    )
+
+    if uploaded_files:
+
+        st.caption(
+            f"{len(uploaded_files)} file(s) selected."
+        )
+
+    if st.button(
+        "Index Documents",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        if not uploaded_files:
+
+            st.warning(
+                "Please upload at least one PDF."
+            )
+
+        else:
+
+            data_dir = Path("data")
+
+            data_dir.mkdir(
+                parents=True,
+                exist_ok=True
+            )
+
+            paths = []
+
+            try:
+
+                with st.spinner(
+                    "Indexing documents..."
+                ):
+
+                    for uploaded_file in uploaded_files:
+
+                        destination = (
+                            data_dir
+                            / uploaded_file.name
+                        )
+
+                        destination.write_bytes(
+                            uploaded_file.getbuffer()
+                        )
+
+                        paths.append(
+                            destination
+                        )
+
+                    stats = ingest_paths(
+                        paths
+                    )
+
+                if stats["new_chunks"] > 0:
+
+                    st.success(
+                        f"{stats['new_chunks']} new chunks added."
+                    )
+
+                else:
+
+                    st.info(
+                        f"No new chunks. "
+                        f"{stats['total_chunks']} chunks already indexed."
+                    )
+
+                st.rerun()
+
+            except Exception as exc:
+
+                st.error(
+                    f"Indexing failed: {exc}"
+                )
 
     st.divider()
 
@@ -309,12 +351,11 @@ with st.sidebar:
 
 
 # ============================================================
-# HEADER
+# MAIN HEADER
 # ============================================================
 
 header_left, header_right = st.columns(
-    [12, 1],
-    vertical_alignment="center",
+    [12, 1]
 )
 
 with header_left:
@@ -329,7 +370,7 @@ with header_left:
         "Meridian Supply Chain AI"
     )
 
-    st.write(
+    st.caption(
         "A local Retrieval-Augmented Generation assistant "
         "for supplier performance, procurement policy, "
         "delivery, quality, inventory, and operational analysis."
@@ -339,6 +380,7 @@ with header_left:
 with header_right:
 
     # Native Streamlit popover.
+    # This is intentionally kept minimal.
     with st.popover(
         "⋮"
     ):
@@ -348,11 +390,13 @@ with header_right:
         )
 
         st.write(
-            f"Documents: {indexed_document_count()}"
+            f"Indexed documents: "
+            f"{get_document_count()}"
         )
 
         st.write(
-            f"Chunks: {collection.count()}"
+            f"Indexed chunks: "
+            f"{collection.count()}"
         )
 
         st.divider()
@@ -374,11 +418,11 @@ st.divider()
 # KNOWLEDGE BASE SUMMARY
 # ============================================================
 
-st.subheader(
+st.header(
     "Knowledge Base"
 )
 
-st.caption(
+st.write(
     "Persistent semantic retrieval across the indexed "
     "Meridian document collection."
 )
@@ -389,37 +433,37 @@ with m1:
 
     st.metric(
         "Source documents",
-        indexed_document_count(),
+        get_document_count()
     )
 
 with m2:
 
     st.metric(
         "Indexed chunks",
-        collection.count(),
+        collection.count()
     )
 
 with m3:
 
     st.metric(
         "Grounding",
-        "100%",
+        "100%"
     )
 
 
 # ============================================================
-# QUICK QUESTIONS
+# WELCOME / QUICK QUESTIONS
 # ============================================================
 
 if not st.session_state.messages:
 
     st.divider()
 
-    st.subheader(
+    st.header(
         "What can I help you find?"
     )
 
-    st.caption(
+    st.write(
         "Ask a natural-language question about supplier "
         "performance, procurement policy, spend, delivery, "
         "quality, or inventory."
@@ -445,7 +489,7 @@ if not st.session_state.messages:
                 "Highest Q1 supplier spend"
             )
 
-            add_history(
+            add_history_title(
                 st.session_state.chat_title
             )
 
@@ -460,8 +504,8 @@ if not st.session_state.messages:
                 "Searching Meridian documents..."
             ):
 
-                answer, sources, timing = (
-                    run_rag(question)
+                answer, sources, timing = ask_meridian(
+                    question
                 )
 
             st.session_state.messages.append(
@@ -491,7 +535,7 @@ if not st.session_state.messages:
                 "Q1 line stoppages"
             )
 
-            add_history(
+            add_history_title(
                 st.session_state.chat_title
             )
 
@@ -506,8 +550,8 @@ if not st.session_state.messages:
                 "Searching Meridian documents..."
             ):
 
-                answer, sources, timing = (
-                    run_rag(question)
+                answer, sources, timing = ask_meridian(
+                    question
                 )
 
             st.session_state.messages.append(
@@ -539,7 +583,7 @@ if not st.session_state.messages:
                 "₹1.4 crore PO authority"
             )
 
-            add_history(
+            add_history_title(
                 st.session_state.chat_title
             )
 
@@ -554,8 +598,8 @@ if not st.session_state.messages:
                 "Searching Meridian documents..."
             ):
 
-                answer, sources, timing = (
-                    run_rag(question)
+                answer, sources, timing = ask_meridian(
+                    question
                 )
 
             st.session_state.messages.append(
@@ -586,7 +630,7 @@ if not st.session_state.messages:
                 "Safety-stock requirement"
             )
 
-            add_history(
+            add_history_title(
                 st.session_state.chat_title
             )
 
@@ -601,8 +645,8 @@ if not st.session_state.messages:
                 "Searching Meridian documents..."
             ):
 
-                answer, sources, timing = (
-                    run_rag(question)
+                answer, sources, timing = ask_meridian(
+                    question
                 )
 
             st.session_state.messages.append(
@@ -618,7 +662,7 @@ if not st.session_state.messages:
 
 
 # ============================================================
-# EXISTING CONVERSATION
+# CONVERSATION
 # ============================================================
 
 for message in st.session_state.messages:
@@ -636,7 +680,7 @@ for message in st.session_state.messages:
             and message.get("sources")
         ):
 
-            st.caption(
+            st.write(
                 "Sources"
             )
 
@@ -649,14 +693,14 @@ for message in st.session_state.messages:
 
 
 # ============================================================
-# NATIVE CHAT INPUT + FILE ATTACHMENT
+# NATIVE CHAT INPUT + FILE ATTACHMENTS
 # ============================================================
 
 submission = st.chat_input(
-    "Ask Meridian or attach a PDF...",
+    "Ask Meridian...",
     accept_file="multiple",
     file_type=["pdf"],
-    max_upload_size=50,
+    max_upload_size=200,
 )
 
 
@@ -668,10 +712,18 @@ if submission:
 
 
     # --------------------------------------------------------
-    # FILE ATTACHMENTS
+    # Process PDF attachments
     # --------------------------------------------------------
 
     if uploaded_files:
+
+        data_dir = Path("data")
+        data_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        saved_paths = []
 
         try:
 
@@ -679,22 +731,37 @@ if submission:
                 "Adding documents to the Meridian knowledge base..."
             ):
 
-                stats = index_uploaded_files(
-                    uploaded_files
+                for uploaded_file in uploaded_files:
+
+                    destination = (
+                        data_dir
+                        / uploaded_file.name
+                    )
+
+                    destination.write_bytes(
+                        uploaded_file.getbuffer()
+                    )
+
+                    saved_paths.append(
+                        destination
+                    )
+
+                stats = ingest_paths(
+                    saved_paths
                 )
 
             if stats["new_chunks"] > 0:
 
-                st.success(
-                    f"Added {stats['new_chunks']} new chunks "
-                    f"from {len(uploaded_files)} PDF file(s)."
+                st.toast(
+                    f"Added {stats['new_chunks']} new chunks.",
+                    icon="??",
                 )
 
             else:
 
-                st.info(
-                    f"The {len(uploaded_files)} PDF file(s) "
-                    f"were already indexed."
+                st.toast(
+                    "Documents were already indexed.",
+                    icon="??",
                 )
 
         except Exception as exc:
@@ -705,7 +772,7 @@ if submission:
 
 
     # --------------------------------------------------------
-    # QUESTION
+    # Process normal question
     # --------------------------------------------------------
 
     if question:
@@ -719,10 +786,12 @@ if submission:
                 make_chat_title(question)
             )
 
-            add_history(
+            add_history_title(
                 st.session_state.chat_title
             )
 
+
+        # User message
 
         st.session_state.messages.append(
             {
@@ -732,6 +801,8 @@ if submission:
         )
 
 
+        # RAG response
+
         try:
 
             with st.spinner(
@@ -739,7 +810,7 @@ if submission:
             ):
 
                 answer, sources, timing = (
-                    run_rag(question)
+                    ask_meridian(question)
                 )
 
         except Exception as exc:
@@ -753,6 +824,8 @@ if submission:
             timing = {}
 
 
+        # Assistant message
+
         st.session_state.messages.append(
             {
                 "role": "assistant",
@@ -764,7 +837,7 @@ if submission:
 
 
     # --------------------------------------------------------
-    # FILE-ONLY SUBMISSION
+    # Attachment-only submission
     # --------------------------------------------------------
 
     elif uploaded_files:
@@ -774,7 +847,7 @@ if submission:
                 "role": "assistant",
                 "content": (
                     f"Added {len(uploaded_files)} PDF "
-                    "document(s) to the Meridian knowledge base."
+                    f"document(s) to the Meridian knowledge base."
                 ),
                 "sources": [],
                 "timing": {},
@@ -783,3 +856,4 @@ if submission:
 
 
     st.rerun()
+

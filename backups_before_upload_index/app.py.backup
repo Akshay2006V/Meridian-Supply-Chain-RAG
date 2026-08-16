@@ -1,0 +1,474 @@
+import shutil
+from pathlib import Path
+
+import streamlit as st
+
+from ingest import ingest_paths
+from rag import ask, collection
+
+
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
+
+st.set_page_config(
+    page_title="Meridian Supply Chain AI",
+    page_icon="📦",
+    layout="wide",
+)
+
+
+# ============================================================
+# CUSTOM CSS
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+
+    .hero {
+        padding: 28px 32px;
+        border-radius: 16px;
+        background: linear-gradient(
+            135deg,
+            #0f172a 0%,
+            #1e3a5f 100%
+        );
+        margin-bottom: 28px;
+    }
+
+    .hero-title {
+        font-size: 32px;
+        font-weight: 700;
+        margin: 0 0 8px 0;
+        color: white;
+    }
+
+    .hero-subtitle {
+        font-size: 16px;
+        color: #dbeafe;
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    div.stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    .metric-card {
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid rgba(128, 128, 128, 0.25);
+        background: rgba(128, 128, 128, 0.06);
+    }
+
+    .metric-number {
+        font-size: 28px;
+        font-weight: 700;
+    }
+
+    .metric-label {
+        font-size: 14px;
+        opacity: 0.75;
+        margin-top: 4px;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# HERO
+# ============================================================
+
+st.markdown(
+    """
+    <div class="hero">
+        <h1 class="hero-title">📦 Meridian Supply Chain AI</h1>
+        <p class="hero-subtitle">
+            Grounded document intelligence for supply-chain
+            performance and procurement policy analysis.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+with st.sidebar:
+
+    st.header("About")
+
+    st.write(
+        """
+        This application uses Retrieval-Augmented
+        Generation (RAG) to answer questions from
+        Meridian Components' documents.
+        """
+    )
+
+    st.divider()
+
+    st.subheader("AI Stack")
+
+    st.write("🧠 LLM: Qwen3 4B")
+    st.write("🔎 Embeddings: Nomic Embed Text")
+    st.write("🗄️ Vector DB: ChromaDB")
+    st.write("📄 PDF Parser: PyPDF")
+    st.write("🖥️ Interface: Streamlit")
+
+    st.divider()
+
+    st.subheader("Knowledge Base")
+
+    st.write(
+        f"📚 Indexed chunks: {collection.count()}"
+    )
+
+    st.caption(
+        "All answers are grounded in the "
+        "indexed document collection."
+    )
+
+
+# ============================================================
+# DOCUMENT UPLOAD + INDEXING
+# ============================================================
+
+st.subheader("📚 Document Knowledge Base")
+
+st.write(
+    "Upload one or more PDF documents and index them "
+    "into the local ChromaDB knowledge base."
+)
+
+uploaded_files = st.file_uploader(
+    "Upload PDF documents",
+    type=["pdf"],
+    accept_multiple_files=True,
+    help=(
+        "Select one or more PDF files to add to "
+        "the Meridian knowledge base."
+    ),
+)
+
+
+index_col, status_col = st.columns(
+    [1, 3]
+)
+
+with index_col:
+
+    index_button = st.button(
+        "📥 Index Documents",
+        type="primary",
+        use_container_width=True,
+    )
+
+
+if index_button:
+
+    if not uploaded_files:
+
+        st.warning(
+            "Please upload at least one PDF document."
+        )
+
+    else:
+
+        data_dir = Path("data")
+        data_dir.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        saved_paths = []
+
+        with st.spinner(
+            "Saving documents, creating chunks, "
+            "generating embeddings, and indexing..."
+        ):
+
+            for uploaded_file in uploaded_files:
+
+                destination = (
+                    data_dir
+                    / uploaded_file.name
+                )
+
+                with open(
+                    destination,
+                    "wb"
+                ) as file:
+
+                    file.write(
+                        uploaded_file.getbuffer()
+                    )
+
+                saved_paths.append(
+                    destination
+                )
+
+            try:
+
+                stats = ingest_paths(
+                    saved_paths
+                )
+
+                st.session_state[
+                    "last_index_stats"
+                ] = stats
+
+            except Exception as exc:
+
+                st.error(
+                    f"Indexing failed: {exc}"
+                )
+
+                st.stop()
+
+        st.success(
+            f"✅ {stats['files_processed']} file(s) "
+            f"processed • "
+            f"{stats['new_chunks']} new chunks stored • "
+            f"{stats['total_chunks']} total chunks in ChromaDB"
+        )
+
+
+if "last_index_stats" in st.session_state:
+
+    stats = st.session_state[
+        "last_index_stats"
+    ]
+
+    with status_col:
+
+        st.info(
+            f"Last indexing: "
+            f"{stats['files_processed']} file(s) processed • "
+            f"{stats['new_chunks']} new chunks • "
+            f"{stats['total_chunks']} total chunks"
+        )
+
+
+# ============================================================
+# ASK MERIDIAN
+# ============================================================
+
+st.divider()
+
+st.subheader("Ask Meridian")
+
+st.write(
+    "Ask questions about supplier performance, "
+    "procurement policy, spend, delivery, quality, "
+    "inventory, and other information contained "
+    "in the indexed documents."
+)
+
+
+question = st.text_area(
+    "Your question",
+    placeholder=(
+        "Example: Which suppliers had the lowest "
+        "on-time delivery in Q1?"
+    ),
+    height=100,
+)
+
+
+col1, col2, _ = st.columns(
+    [1, 1, 4]
+)
+
+
+with col1:
+
+    ask_button = st.button(
+        "🔍 Ask Meridian",
+        type="primary",
+        use_container_width=True,
+    )
+
+
+with col2:
+
+    clear_button = st.button(
+        "Clear",
+        use_container_width=True,
+    )
+
+
+if clear_button:
+    st.rerun()
+
+
+# ============================================================
+# QUERY
+# ============================================================
+
+if ask_button:
+
+    if not question.strip():
+
+        st.warning(
+            "Please enter a question first."
+        )
+
+    else:
+
+        with st.spinner(
+            "Searching documents and generating answer..."
+        ):
+
+            try:
+
+                answer, retrieved, timing = ask(
+                    question.strip()
+                )
+
+            except Exception as exc:
+
+                st.error(
+                    f"An error occurred: {exc}"
+                )
+
+                st.stop()
+
+
+        st.divider()
+
+        st.subheader("Answer")
+
+        with st.container(border=True):
+
+            st.markdown(answer)
+
+
+        st.divider()
+
+        st.subheader("Sources")
+
+        displayed_sources = set()
+
+        for item in retrieved:
+
+            metadata = item["metadata"]
+
+            source = metadata["source"]
+            page = metadata["page"]
+
+            source_key = (
+                source,
+                page
+            )
+
+            if source_key in displayed_sources:
+                continue
+
+            displayed_sources.add(
+                source_key
+            )
+
+            if "Review" in source:
+
+                document_label = (
+                    "Supply Chain Performance Review"
+                )
+
+            elif "Policy" in source:
+
+                document_label = (
+                    "Procurement Policy Handbook"
+                )
+
+            else:
+
+                document_label = (
+                    "Indexed PDF Document"
+                )
+
+            with st.container(
+                border=True
+            ):
+
+                st.markdown(
+                    f"**📄 {document_label}**"
+                )
+
+                st.caption(
+                    f"Source: {source} • Page {page}"
+                )
+
+
+# ============================================================
+# EMPTY STATE / METRICS
+# ============================================================
+
+else:
+
+    st.divider()
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-number">
+                    {collection.count()}
+                </div>
+                <div class="metric-label">
+                    Indexed Chunks
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col2:
+
+        st.markdown(
+            """
+            <div class="metric-card">
+                <div class="metric-number">
+                    📄
+                </div>
+                <div class="metric-label">
+                    PDF Knowledge Base
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+
+        st.markdown(
+            """
+            <div class="metric-card">
+                <div class="metric-number">
+                    ✓
+                </div>
+                <div class="metric-label">
+                    Grounded Answers
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.info(
+        "Upload PDFs above and click "
+        "\"Index Documents\" before asking questions "
+        "about new documents."
+    )

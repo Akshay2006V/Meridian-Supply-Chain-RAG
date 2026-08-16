@@ -1,0 +1,1145 @@
+from pathlib import Path
+import textwrap
+
+import streamlit as st
+
+from ingest import ingest_paths
+from rag import ask, collection
+
+
+# ============================================================
+# PAGE CONFIG
+# ============================================================
+
+st.set_page_config(
+    page_title="Meridian Supply Chain AI",
+    page_icon="📦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
+# ============================================================
+# SESSION STATE
+# ============================================================
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "last_index_stats" not in st.session_state:
+    st.session_state.last_index_stats = None
+
+
+# ============================================================
+# HTML HELPER
+# Prevents Streamlit from displaying HTML as literal code.
+# ============================================================
+
+def render_html(html: str):
+    st.markdown(
+        textwrap.dedent(html).strip(),
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# PREMIUM UI
+# ============================================================
+
+render_html(
+    """
+    <style>
+
+    /* ========================================================
+       GLOBAL FONT + PAGE
+       ======================================================== */
+
+    html, body, [class*="css"] {
+        font-family:
+            Inter,
+            "Segoe UI",
+            Roboto,
+            Helvetica,
+            Arial,
+            sans-serif;
+    }
+
+    .stApp {
+        background:
+            radial-gradient(
+                circle at 80% 5%,
+                rgba(42, 78, 130, 0.13),
+                transparent 32%
+            ),
+            radial-gradient(
+                circle at 10% 55%,
+                rgba(91, 62, 145, 0.08),
+                transparent 28%
+            ),
+            linear-gradient(
+                180deg,
+                #0a0d12 0%,
+                #0b0f15 55%,
+                #0a0d12 100%
+            );
+    }
+
+    .block-container {
+        max-width: 1380px;
+        padding-top: 1.25rem;
+        padding-bottom: 6rem;
+    }
+
+    /* ========================================================
+       HIDE UNNECESSARY STREAMLIT UI
+       ======================================================== */
+
+    header[data-testid="stHeader"] {
+        background: transparent;
+    }
+
+    footer {
+        visibility: hidden;
+    }
+
+    /* ========================================================
+       SIDEBAR
+       ======================================================== */
+
+    section[data-testid="stSidebar"] {
+        background:
+            linear-gradient(
+                180deg,
+                rgba(18, 22, 30, 0.98),
+                rgba(11, 14, 20, 0.98)
+            );
+        border-right: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .sidebar-brand {
+        font-size: 17px;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+    }
+
+    .sidebar-sub {
+        margin-top: 4px;
+        font-size: 11px;
+        opacity: 0.52;
+        line-height: 1.45;
+    }
+
+    .sidebar-heading {
+        margin-top: 20px;
+        margin-bottom: 7px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        opacity: 0.42;
+    }
+
+    .sidebar-stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 7px;
+    }
+
+    .stack-pill {
+        padding: 5px 8px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.07);
+        font-size: 10px;
+        color: rgba(255,255,255,0.74);
+    }
+
+    /* ========================================================
+       TOP BRAND
+       ======================================================== */
+
+    .brand-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 28px;
+    }
+
+    .brand-box {
+        width: 42px;
+        height: 42px;
+        border-radius: 13px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        background:
+            linear-gradient(
+                145deg,
+                #f2c889 0%,
+                #c88c52 55%,
+                #8d5f39 100%
+            );
+
+        box-shadow:
+            0 8px 24px rgba(196, 137, 80, 0.22),
+            inset 0 1px 0 rgba(255,255,255,0.35);
+
+        font-size: 23px;
+    }
+
+    .brand-name {
+        font-size: 21px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+    }
+
+    .brand-subtitle {
+        margin-top: 3px;
+        font-size: 11px;
+        opacity: 0.5;
+    }
+
+    /* ========================================================
+       HERO
+       ======================================================== */
+
+    .hero-card {
+        position: relative;
+        overflow: hidden;
+
+        padding: 42px 42px 36px 42px;
+        margin-bottom: 28px;
+
+        border-radius: 24px;
+
+        background:
+            linear-gradient(
+                135deg,
+                rgba(20, 40, 70, 0.98),
+                rgba(26, 56, 94, 0.96)
+            );
+
+        border: 1px solid rgba(142, 188, 255, 0.13);
+
+        box-shadow:
+            0 18px 60px rgba(0,0,0,0.22),
+            inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .hero-card::before {
+        content: "";
+        position: absolute;
+        width: 420px;
+        height: 420px;
+        border-radius: 50%;
+
+        right: -170px;
+        top: -230px;
+
+        background:
+            radial-gradient(
+                circle,
+                rgba(111, 177, 255, 0.15),
+                transparent 68%
+            );
+    }
+
+    .hero-card::after {
+        content: "";
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        border-radius: 50%;
+
+        left: -180px;
+        bottom: -220px;
+
+        background:
+            radial-gradient(
+                circle,
+                rgba(106, 76, 190, 0.13),
+                transparent 68%
+            );
+    }
+
+    .hero-content {
+        position: relative;
+        z-index: 2;
+    }
+
+    .hero-title {
+        font-size: clamp(31px, 4vw, 48px);
+        line-height: 1.05;
+        font-weight: 850;
+        letter-spacing: -0.05em;
+        color: white;
+        margin: 0;
+    }
+
+    .hero-subtitle {
+        max-width: 760px;
+        margin-top: 13px;
+
+        font-size: 15px;
+        line-height: 1.65;
+
+        color: rgba(229,239,255,0.80);
+    }
+
+    .hero-line {
+        width: 92px;
+        height: 3px;
+        border-radius: 99px;
+        margin-top: 20px;
+
+        background:
+            linear-gradient(
+                90deg,
+                #9ecbff,
+                #6d8cff
+            );
+
+        box-shadow:
+            0 0 18px rgba(123, 161, 255, 0.40);
+    }
+
+    /* ========================================================
+       SECTION HEADINGS
+       ======================================================== */
+
+    .section-title {
+        font-size: 19px;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+    }
+
+    .section-description {
+        margin-top: 4px;
+        margin-bottom: 14px;
+
+        font-size: 11px;
+        line-height: 1.55;
+        opacity: 0.48;
+    }
+
+    /* ========================================================
+       METRICS
+       ======================================================== */
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+
+        gap: 12px;
+        margin: 16px 0 30px 0;
+    }
+
+    .metric-card {
+        padding: 18px 19px;
+
+        border-radius: 16px;
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(255,255,255,0.035),
+                rgba(255,255,255,0.018)
+            );
+
+        border: 1px solid rgba(255,255,255,0.075);
+
+        transition:
+            transform 0.18s ease,
+            border-color 0.18s ease,
+            box-shadow 0.18s ease;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(140, 180, 255, 0.18);
+
+        box-shadow:
+            0 10px 28px rgba(0,0,0,0.14);
+    }
+
+    .metric-value {
+        font-size: 25px;
+        font-weight: 850;
+        letter-spacing: -0.04em;
+    }
+
+    .metric-label {
+        margin-top: 5px;
+        font-size: 10px;
+        opacity: 0.48;
+    }
+
+    /* ========================================================
+       UPLOAD PANEL
+       ======================================================== */
+
+    .upload-panel {
+        padding: 20px;
+
+        border-radius: 17px;
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(255,255,255,0.028),
+                rgba(255,255,255,0.015)
+            );
+
+        border: 1px solid rgba(255,255,255,0.075);
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    /* ========================================================
+       CHAT AREA
+       ======================================================== */
+
+    .chat-shell {
+        margin-top: 30px;
+    }
+
+    [data-testid="stChatMessage"] {
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+
+    [data-testid="stChatMessageContent"] {
+        max-width: 860px;
+        font-size: 14px;
+        line-height: 1.7;
+    }
+
+    /* User bubble */
+
+    [data-testid="stChatMessage"]:has(
+        [data-testid="chatAvatarIcon-user"]
+    ) [data-testid="stChatMessageContent"] {
+        background:
+            linear-gradient(
+                135deg,
+                rgba(49, 63, 86, 0.75),
+                rgba(36, 47, 65, 0.82)
+            );
+
+        border:
+            1px solid rgba(150,180,220,0.10);
+
+        padding: 12px 15px;
+        border-radius: 16px;
+    }
+
+    /* Assistant bubble */
+
+    [data-testid="stChatMessage"]:has(
+        [data-testid="chatAvatarIcon-assistant"]
+    ) [data-testid="stChatMessageContent"] {
+        background:
+            linear-gradient(
+                135deg,
+                rgba(255,255,255,0.035),
+                rgba(255,255,255,0.018)
+            );
+
+        border:
+            1px solid rgba(255,255,255,0.065);
+
+        padding: 15px 17px;
+        border-radius: 16px;
+    }
+
+    /* ========================================================
+       SOURCE CARDS
+       ======================================================== */
+
+    .sources-heading {
+        margin-top: 13px;
+        margin-bottom: 7px;
+
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+
+        opacity: 0.46;
+    }
+
+    .source-card {
+        padding: 11px 13px;
+        margin: 6px 0;
+
+        border-radius: 12px;
+
+        background:
+            rgba(255,255,255,0.022);
+
+        border:
+            1px solid rgba(255,255,255,0.06);
+    }
+
+    .source-title {
+        font-size: 11px;
+        font-weight: 750;
+    }
+
+    .source-meta {
+        margin-top: 3px;
+        font-size: 9px;
+        opacity: 0.46;
+    }
+
+    /* ========================================================
+       SUGGESTION BUTTONS
+       ======================================================== */
+
+    .suggestions-label {
+        margin: 16px 0 9px 0;
+
+        text-align: center;
+
+        font-size: 10px;
+        font-weight: 750;
+
+        opacity: 0.43;
+    }
+
+    div.stButton > button {
+        border-radius: 12px;
+
+        min-height: 42px;
+
+        font-size: 11px;
+        font-weight: 700;
+
+        transition:
+            transform 0.16s ease,
+            box-shadow 0.16s ease,
+            border-color 0.16s ease;
+    }
+
+    div.stButton > button:hover {
+        transform: translateY(-1px);
+
+        box-shadow:
+            0 8px 20px rgba(0,0,0,0.16);
+    }
+
+    /* ========================================================
+       CHAT INPUT
+       ======================================================== */
+
+    [data-testid="stChatInput"] {
+        margin-top: 10px;
+    }
+
+    [data-testid="stChatInput"] textarea {
+        min-height: 58px !important;
+
+        border-radius: 17px !important;
+
+        background:
+            rgba(19,23,31,0.92) !important;
+
+        border:
+            1px solid rgba(255,255,255,0.10) !important;
+
+        box-shadow:
+            0 10px 36px rgba(0,0,0,0.18),
+            inset 0 1px 0 rgba(255,255,255,0.03);
+
+        font-size: 13px !important;
+    }
+
+    [data-testid="stChatInput"] textarea:focus {
+        border-color:
+            rgba(116,153,255,0.42) !important;
+
+        box-shadow:
+            0 0 0 1px rgba(116,153,255,0.18),
+            0 12px 40px rgba(0,0,0,0.22) !important;
+    }
+
+    /* ========================================================
+       RESPONSIVE
+       ======================================================== */
+
+    @media (max-width: 900px) {
+
+        .metric-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .hero-card {
+            padding: 30px;
+        }
+
+        .hero-title {
+            font-size: 31px;
+        }
+
+    }
+
+    </style>
+    """
+)
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+render_html(
+    """
+    <div class="sidebar-brand">📦 Meridian Supply Chain AI</div>
+    <div class="sidebar-sub">
+        Grounded enterprise document intelligence
+    </div>
+    """
+)
+
+st.divider()
+
+render_html(
+    """
+    <div class="sidebar-heading">Knowledge Base</div>
+    """
+)
+
+st.metric(
+    "Indexed chunks",
+    collection.count(),
+)
+
+uploaded_files = st.file_uploader(
+    "Add PDF documents",
+    type=["pdf"],
+    accept_multiple_files=True,
+    help="Upload one or more PDF documents.",
+)
+
+if st.button(
+    "📥 Index Documents",
+    type="primary",
+    use_container_width=True,
+):
+
+    if not uploaded_files:
+
+        st.warning(
+            "Upload at least one PDF first."
+        )
+
+    else:
+
+        data_dir = Path("data")
+        data_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        saved_paths = []
+
+        with st.spinner(
+            "Indexing documents..."
+        ):
+
+            try:
+
+                for uploaded_file in uploaded_files:
+
+                    destination = (
+                        data_dir / uploaded_file.name
+                    )
+
+                    with open(
+                        destination,
+                        "wb",
+                    ) as file:
+
+                        file.write(
+                            uploaded_file.getbuffer()
+                        )
+
+                    saved_paths.append(
+                        destination
+                    )
+
+                stats = ingest_paths(
+                    saved_paths
+                )
+
+                st.session_state.last_index_stats = stats
+
+            except Exception as exc:
+
+                st.error(
+                    f"Indexing failed: {exc}"
+                )
+
+                st.stop()
+
+        if stats["new_chunks"] > 0:
+
+            st.success(
+                f"{stats['files_checked']} file(s) checked • "
+                f"{stats['new_chunks']} new chunks • "
+                f"{stats['total_chunks']} total"
+            )
+
+        else:
+
+            st.info(
+                f"{stats['files_checked']} file(s) checked • "
+                f"Everything already indexed • "
+                f"{stats['total_chunks']} total chunks"
+            )
+
+st.divider()
+
+render_html(
+    """
+    <div class="sidebar-heading">AI Stack</div>
+
+    <div class="sidebar-stack">
+        <span class="stack-pill">Qwen3 4B</span>
+        <span class="stack-pill">Nomic Embed</span>
+        <span class="stack-pill">ChromaDB</span>
+        <span class="stack-pill">PyPDF</span>
+        <span class="stack-pill">Streamlit</span>
+    </div>
+    """
+)
+
+st.divider()
+
+if st.button(
+    "🧹 Clear Chat",
+    use_container_width=True,
+):
+
+    st.session_state.messages = []
+    st.rerun()
+
+render_html(
+    """
+    <div class="sidebar-sub" style="margin-top:14px;">
+        Answers are generated only from indexed Meridian documents.
+    </div>
+    """
+)
+
+
+# ============================================================
+# TOP BRAND
+# ============================================================
+
+render_html(
+    """
+    <div class="brand-bar">
+        <div class="brand-box">📦</div>
+
+        <div>
+            <div class="brand-name">Meridian Supply Chain AI</div>
+
+            <div class="brand-subtitle">
+                Supply-chain & procurement intelligence
+            </div>
+        </div>
+    </div>
+    """
+)
+
+
+# ============================================================
+# HERO
+# ============================================================
+
+render_html(
+    """
+    <div class="hero-card">
+        <div class="hero-content">
+
+            <div class="hero-title">
+                Grounded intelligence for Meridian.
+            </div>
+
+            <div class="hero-subtitle">
+                Search supplier performance, procurement policy,
+                delivery, quality and operational information
+                using your indexed enterprise documents.
+            </div>
+
+            <div class="hero-line"></div>
+
+        </div>
+    </div>
+    """
+)
+
+
+# ============================================================
+# STATS
+# ============================================================
+
+render_html(
+    """
+    <div class="section-title">Knowledge Base</div>
+
+    <div class="section-description">
+        Persistent local retrieval across the indexed document collection.
+    </div>
+    """
+)
+
+render_html(
+    f"""
+    <div class="metric-grid">
+
+        <div class="metric-card">
+            <div class="metric-value">2</div>
+            <div class="metric-label">
+                Indexed source documents
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-value">{collection.count()}</div>
+            <div class="metric-label">
+                Persistent ChromaDB chunks
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-value">✓</div>
+            <div class="metric-label">
+                Grounded document-only answers
+            </div>
+        </div>
+
+    </div>
+    """
+)
+
+
+# ============================================================
+# CHAT WELCOME
+# ============================================================
+
+if not st.session_state.messages:
+
+    render_html(
+        """
+        <div class="welcome-panel" style="
+            max-width: 850px;
+            margin: 3.2rem auto 1.8rem auto;
+            text-align: center;
+        ">
+
+            <div style="
+                font-size: 34px;
+                font-weight: 850;
+                letter-spacing: -0.04em;
+                margin-bottom: 10px;
+            ">
+                Ask Meridian
+            </div>
+
+            <div style="
+                max-width: 690px;
+                margin: auto;
+                font-size: 14px;
+                line-height: 1.65;
+                opacity: 0.58;
+            ">
+                Ask a natural-language question and get a
+                concise answer grounded only in your indexed
+                supply-chain and procurement documents.
+            </div>
+
+        </div>
+
+        <div class="suggestions-label">
+            Suggested questions
+        </div>
+        """
+    )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+
+        if st.button(
+            "Which supplier had the highest Q1 spend?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Which supplier had the highest spend "
+                        "in Q1, and what was its on-time "
+                        "delivery percentage?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+    with c2:
+
+        if st.button(
+            "How many line stoppages occurred in Q1?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "How many line stoppages happened "
+                        "in Q1, what was the total downtime, "
+                        "and what caused them?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+    c3, c4 = st.columns(2)
+
+    with c3:
+
+        if st.button(
+            "Who approves a ₹1.4 crore purchase order?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "What is the approval authority for "
+                        "a purchase order worth ₹1.4 crore?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+    with c4:
+
+        if st.button(
+            "How much safety stock is required?",
+            use_container_width=True,
+        ):
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Microcontrollers are imported with "
+                        "a 46-day lead time. Using the "
+                        "safety-stock policy, how many days "
+                        "of stock should be held for this part?"
+                    ),
+                }
+            )
+
+            st.rerun()
+
+
+# ============================================================
+# CHAT HISTORY
+# ============================================================
+
+for message in st.session_state.messages:
+
+    with st.chat_message(
+        message["role"],
+        avatar=(
+            "👤"
+            if message["role"] == "user"
+            else "📦"
+        ),
+    ):
+
+        st.markdown(
+            message["content"]
+        )
+
+        if (
+            message["role"] == "assistant"
+            and message.get("sources")
+        ):
+
+            render_html(
+                """
+                <div class="sources-heading">
+                    Sources
+                </div>
+                """
+            )
+
+            for source in message["sources"]:
+
+                render_html(
+                    f"""
+                    <div class="source-card">
+                        <div class="source-title">
+                            📄 {source["label"]}
+                        </div>
+
+                        <div class="source-meta">
+                            {source["source"]} • Page {source["page"]}
+                        </div>
+                    </div>
+                    """
+                )
+
+
+# ============================================================
+# CHAT INPUT
+# ============================================================
+
+prompt = st.chat_input(
+    "Message Meridian Supply Chain AI..."
+)
+
+
+# ============================================================
+# HANDLE USER MESSAGE
+# ============================================================
+
+if prompt:
+
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": prompt,
+        }
+    )
+
+    with st.chat_message(
+        "user",
+        avatar="👤",
+    ):
+
+        st.markdown(prompt)
+
+
+    with st.chat_message(
+        "assistant",
+        avatar="📦",
+    ):
+
+        with st.spinner(
+            "Searching the Meridian knowledge base..."
+        ):
+
+            try:
+
+                answer, retrieved, timing = ask(
+                    prompt.strip()
+                )
+
+            except Exception as exc:
+
+                answer = (
+                    "An error occurred while processing "
+                    f"your question: {exc}"
+                )
+
+                retrieved = []
+                timing = {}
+
+        st.markdown(answer)
+
+        source_data = []
+        displayed_sources = set()
+
+        for item in retrieved:
+
+            metadata = item["metadata"]
+
+            source = metadata["source"]
+            page = metadata["page"]
+
+            key = (
+                source,
+                page,
+            )
+
+            if key in displayed_sources:
+                continue
+
+            displayed_sources.add(
+                key
+            )
+
+            if "Review" in source:
+
+                label = (
+                    "Supply Chain Performance Review"
+                )
+
+            elif "Policy" in source:
+
+                label = (
+                    "Procurement Policy Handbook"
+                )
+
+            else:
+
+                label = "Indexed PDF Document"
+
+            source_data.append(
+                {
+                    "label": label,
+                    "source": source,
+                    "page": page,
+                }
+            )
+
+        if source_data:
+
+            render_html(
+                """
+                <div class="sources-heading">
+                    Sources
+                </div>
+                """
+            )
+
+            for source in source_data:
+
+                render_html(
+                    f"""
+                    <div class="source-card">
+                        <div class="source-title">
+                            📄 {source["label"]}
+                        </div>
+
+                        <div class="source-meta">
+                            {source["source"]} • Page {source["page"]}
+                        </div>
+                    </div>
+                    """
+                )
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer,
+            "sources": source_data,
+            "timing": timing,
+        }
+    )

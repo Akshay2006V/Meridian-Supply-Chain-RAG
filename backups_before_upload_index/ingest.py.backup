@@ -153,7 +153,6 @@ def ingest_paths(pdf_paths):
     total_new_chunks = 0
     files_processed = 0
     files_skipped = 0
-    files_checked = 0
 
     for pdf_path in pdf_paths:
 
@@ -161,8 +160,6 @@ def ingest_paths(pdf_paths):
 
         if not pdf_path.exists():
             continue
-
-        files_checked += 1
 
         print(
             f"\nProcessing: {pdf_path.name}"
@@ -207,8 +204,7 @@ def ingest_paths(pdf_paths):
         if not new_documents:
 
             print(
-                "All chunks already exist. "
-                "Nothing new to add."
+                "All chunks already exist. Skipping."
             )
 
             files_skipped += 1
@@ -256,7 +252,6 @@ def ingest_paths(pdf_paths):
         )
 
     return {
-        "files_checked": files_checked,
         "files_processed": files_processed,
         "files_skipped": files_skipped,
         "new_chunks": total_new_chunks,
